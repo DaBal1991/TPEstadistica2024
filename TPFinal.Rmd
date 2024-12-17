@@ -1,0 +1,1013 @@
+---
+title: "Informe sobre los efectos de la ley 26.687/11 sobre el Tabaquismo en Argentina"
+author: "Baluja, Damián y Ortiz, Carlos"
+output: 
+  html_document:
+    theme: journal
+    toc: yes
+    toc_float:
+      collapsed: true
+date: "`r Sys.Date()`"
+runtime: shiny
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
+<!-- Configuración -->
+
+```{r setup, include=FALSE, echo=FALSE}
+pacman::p_load(dplyr, tidyverse, DT, kableExtra, plotly, shiny, ggplot2, tidyr, ggthemes, treemap, ggfittext,
+               treemapify, ggparty)
+
+```
+
+<!-- Pasando códigos de Provincia a String -->
+
+```{r crear_DataFrame, echo=FALSE}
+provincias <- data.frame(
+  codProv = c(2, 6, 10, 14, 18, 22, 26, 30, 34, 38, 42, 46, 50, 54, 58, 62, 66, 70, 74, 78, 82, 86, 90, 94),
+  Nombre = c("CABA", "Buenos Aires", "Catamarca", "Córdoba", "Corrientes", "Chaco", "Chubut", "Entre Ríos", 
+             "Formosa", "Jujuy", "La Pampa", "La Rioja", "Mendoza", "Misiones", "Neuquén", "Río Negro", "Salta", 
+             "San Juan", "San Luis", "Santa Cruz", "Santa Fe", "Santiago del Estero", "Tucumán", "Tierra del Fuego")
+)
+```
+
+<!-- Cargando Bases de Datos - Encuesta Nacional de Factores de Riesgo -->
+
+```{r obteniendo_datos, echo=FALSE}
+
+# ENFR 2005
+datos2005 <- read.table("db/2005/ENFR2005.txt", sep = "|", header = TRUE)
+datos2005 <- datos2005 %>%
+  rename(codProv = PROV)
+
+# ENFR 2009
+datos2009 <- read.table("db/2009/ENFR2009.txt", sep = "|", header = TRUE)
+datos2009 <- datos2009 %>%
+  rename(codProv = PRVNC)
+
+# ENFR 2013
+datos2013 <- read.table("db/2013/ENFR2013.txt", sep = "|", header = TRUE)
+datos2013 <- datos2013 %>%
+  rename(codProv = COD_PROVINCIA)
+
+# ENFR 2018
+datos2018 <- read.table("db/2018/ENFR2018.txt", sep = "|", header = TRUE)
+datos2018 <- datos2018 %>%
+  rename(codProv = cod_provincia)
+
+totalEncuestados2005 = nrow(datos2005)
+totalEncuestados2009 = nrow(datos2009)
+totalEncuestados2013 = nrow(datos2013)
+totalEncuestados2018 = nrow(datos2018)
+
+```
+
+<!-- Datos: Fumadores|Exfumadores|No Fumadores - Distribución nacional -->
+
+```{r clasificacion, echo=FALSE}
+
+# 2005
+  fumadores2005 <- datos2005 %>%
+  summarise(
+    fumador = sum(CONSUMO_TABACO_100 == 1),
+    exFumador = sum(CONSUMO_TABACO_100 == 2),
+    noFumador = sum(CONSUMO_TABACO_100 == 3)
+  ) %>%
+  mutate(año = "2005")
+
+
+#2009
+  fumadores2009 <- datos2009 %>%
+  summarise(
+      fumador = sum(CON_TA == 1),
+      exFumador = sum(CON_TA == 2),
+      noFumador = sum(CON_TA == 3)
+    ) %>%
+  mutate(año = "2009")
+
+#2013
+    fumadores2013 <- datos2013 %>%
+    summarise(
+      fumador = sum(CONSUMO_TABACO_100 == 1),
+      exFumador = sum(CONSUMO_TABACO_100 == 2),
+      noFumador = sum(CONSUMO_TABACO_100 == 3)
+    ) %>%
+  mutate(año = "2013")
+
+#2018
+    fumadores2018 <- datos2018 %>%
+    summarise(
+      fumador = sum(consumo_tabaco_100 == 1),
+      exFumador = sum(consumo_tabaco_100 == 2),
+      noFumador = sum(consumo_tabaco_100 == 3)
+    ) %>%
+  mutate(año = "2018")
+    
+  resultado_total <- bind_rows(fumadores2005, fumadores2009, fumadores2013, fumadores2018)
+
+```
+
+<!-- Datos: Han fumado al menos una vez Vs. Nunca han fumado por Provincia -->
+
+```{r encuestados_Tabaquismo, echo=FALSE}
+
+# 2005
+encuestadosTabaquismo2005 <- datos2005 %>%
+  group_by(Provincia = provincias$Nombre[match(codProv, provincias$codProv)]) %>%
+  summarise(
+    si = sum(CITA01 == 1),
+    no = sum(CITA01 == 2),
+    hombresQueHanFumado = sum(CITA01 == 1 & CHCH04 == 1),
+    hombresQueNuncaHanFumado = sum(CITA01 == 2 & CHCH04 == 1),
+    mujeresQueHanFumado = sum(CITA01 == 1 & CHCH04 == 2),
+    mujeresQueNuncaHanFumado = sum(CITA01 == 2 & CHCH04 == 2),
+    total = si + no,
+    .groups = 'drop'
+    ) 
+ 
+# 2009
+encuestadosTabaquismo2009 <- datos2009 %>%
+  group_by(Provincia = provincias$Nombre[match(codProv, provincias$codProv)]) %>%
+  summarise(
+    si = sum(BITA01 == 1),
+    no = sum(BITA01 == 2),
+    hombresQueHanFumado = sum(BITA01 == 1 & BHCH04 == 1),
+    hombresQueNuncaHanFumado = sum(BITA01 == 2 & BHCH04 == 1),
+    mujeresQueHanFumado = sum(BITA01 == 1 & BHCH04 == 2),
+    mujeresQueNuncaHanFumado = sum(BITA01 == 2 & BHCH04 == 2),
+    total = si + no,
+    .groups = 'drop'
+    )
+
+# 2013
+encuestadosTabaquismo2013 <- datos2013 %>%
+  group_by(Provincia = provincias$Nombre[match(codProv, provincias$codProv)]) %>%
+  summarise(
+    si = sum(BITA01 == 1),
+    no = sum(BITA01 == 2),
+    hombresQueHanFumado = sum(BITA01 == 1 & BHCH04 == 1),
+    hombresQueNuncaHanFumado = sum(BITA01 == 2 & BHCH04 == 1),
+    mujeresQueHanFumado = sum(BITA01 == 1 & BHCH04 == 2),
+    mujeresQueNuncaHanFumado = sum(BITA01 == 2 & BHCH04 == 2),
+    total = si + no,
+    .groups = 'drop'
+  )
+
+# 2018
+encuestadosTabaquismo2018 <- datos2018 %>%
+  group_by(Provincia = provincias$Nombre[match(codProv, provincias$codProv)]) %>%
+  summarise(
+    si = sum(bita01 == 1),
+    no = sum(bita01 == 2),
+    hombresQueHanFumado = sum(bita01 == 1 & bhch03 == 1),
+    hombresQueNuncaHanFumado = sum(bita01 == 2 & bhch03 == 1),
+    mujeresQueHanFumado = sum(bita01 == 1 & bhch03 == 2),
+    mujeresQueNuncaHanFumado = sum(bita01 == 2 & bhch03 == 2),
+    total = si + no,
+    .groups = 'drop'
+  )
+
+# Combinacion de tablas
+encuestadosTabaquismo <- bind_rows(
+  encuestadosTabaquismo2005 %>% mutate(Año = 2005),
+  encuestadosTabaquismo2009 %>% mutate(Año = 2009),
+  encuestadosTabaquismo2013 %>% mutate(Año = 2013),
+  encuestadosTabaquismo2018 %>% mutate(Año = 2018)
+)
+
+```
+
+<!-- Datos: Edad en que han empezado a fumar -->
+
+```{r edadFumador, echo=FALSE}
+
+# 2005
+inicioFumar2005 <- datos2005 %>%
+  filter(CONSUMO_TABACO_100 == 1 & CITA02 != 99) %>%
+  mutate(RangoEdad = cut(CITA02,
+                     breaks = c(1, 10, 20, 30, 40, 50, 60, 70, 75, 100),
+                     labels= c("1-9", "10-19", "20-29", "30-39", "40-49", "50-59", "60-69", "70-74", "75+"),
+                     right = TRUE,
+                     include.lowest = TRUE
+                     )) %>%
+  group_by(RangoEdad) %>%
+  summarise(
+    fumadores = n(),
+    .groups = 'drop'
+  )
+
+# 2009
+inicioFumar2009 <- datos2009 %>%
+  filter(CON_TA == 1 & BITA02 != 99) %>%
+  mutate(RangoEdad = cut(BITA02,
+                     breaks = c(1, 10, 20, 30, 40, 50, 60, 70, 75, 100),
+                     labels= c("1-9", "10-19", "20-29", "30-39", "40-49", "50-59", "60-69", "70-74", "75+"),
+                     right = TRUE,
+                     include.lowest = TRUE
+                     )) %>%
+  group_by(RangoEdad) %>%
+  summarise(
+    fumadores = n(),
+    .groups = 'drop'
+  )
+
+# 2013
+inicioFumar2013 <- datos2013 %>%
+  filter(CONSUMO_TABACO_100 == 1 & BITA02 != 99) %>%
+  mutate(RangoEdad = cut(BITA02,
+                     breaks = c(1, 10, 20, 30, 40, 50, 60, 70, 75, 100),
+                     labels= c("1-9", "10-19", "20-29", "30-39", "40-49", "50-59", "60-69", "70-74", "75+"),
+                     right = TRUE,
+                     include.lowest = TRUE
+                     )) %>%
+  group_by(RangoEdad) %>%
+  summarise(
+    fumadores = n(),
+    .groups = 'drop'
+  )
+
+# 2018
+inicioFumar2018 <- datos2018 %>%
+  filter(consumo_tabaco_100 == 1 & bita02 != 99) %>%
+  mutate(RangoEdad = cut(bita02,
+                     breaks = c(1, 10, 20, 30, 40, 50, 60, 70, 75, 100),
+                     labels= c("1-9", "10-19", "20-29", "30-39", "40-49", "50-59", "60-69", "70-74", "75+"),
+                     right = TRUE,
+                     include.lowest = TRUE
+                     )) %>%
+  group_by(RangoEdad) %>%
+  summarise(
+    fumadores = n(),
+    .groups = 'drop'
+  )
+
+# Combinacion de tablas
+fumadoresCombinados <- bind_rows(
+  mutate(inicioFumar2005, Año = 2005),
+  mutate(inicioFumar2009, Año = 2009),
+  mutate(inicioFumar2013, Año = 2013),
+  mutate(inicioFumar2018, Año = 2018)
+)
+
+
+```
+
+<!-- Datos: Comparación de habitos de los fumadores por rango de edad -->
+
+```{r encuestados_habitos, echo=FALSE}
+
+# 2005
+habito2005 <- datos2005 %>%
+  filter(CONSUMO_TABACO_100 == 1) %>%
+  mutate(RangoEdad = cut(CHCH05,
+                     breaks = c(18, 24, 34, 49, 65, 100),
+                     labels= c("18-24", "25-34", "35-49", "50-65", "65+"),
+                     right = TRUE,
+                     include.lowest = TRUE
+                     )) %>%
+  group_by(RangoEdad) %>%
+  summarise(
+    diarios = sum(CITA04 == 1, na.rm = TRUE),
+    a_veces = sum(CITA04 == 2, na.rm = TRUE),
+    total = diarios + a_veces,
+    .groups = 'drop'
+    )
+
+# 2009
+habito2009 <- datos2009 %>%
+  filter(CON_TA == 1) %>%
+  mutate(RangoEdad = cut(BHCH05,
+                     breaks = c(18, 24, 34, 49, 65, 100),
+                     labels= c("18-24", "25-34", "35-49", "50-65", "65+"),
+                     right = TRUE,
+                     include.lowest = TRUE
+                     )) %>%
+  group_by(RangoEdad) %>%
+  summarise(
+    diarios = sum(BITA04 == 1, na.rm = TRUE),
+    a_veces = sum(BITA04 == 2, na.rm = TRUE),
+    total = diarios + a_veces,
+    .groups = 'drop'
+    )
+
+# 2013
+habito2013 <- datos2013 %>%
+  filter(CONSUMO_TABACO_100 == 1) %>%
+  mutate(RangoEdad = cut(BHCH05,
+                     breaks = c(18, 24, 34, 49, 65, 100),
+                     labels= c("18-24", "25-34", "35-49", "50-65", "65+"),
+                     right = TRUE,
+                     include.lowest = TRUE
+                     )) %>%
+  group_by(RangoEdad) %>%
+  summarise(
+    diarios = sum(BITA04 == 1, na.rm = TRUE),
+    a_veces = sum(BITA04 == 2, na.rm = TRUE),
+    total = diarios + a_veces,
+    .groups = 'drop'
+  )
+
+# 2018
+habito2018 <- datos2018 %>%
+  filter(consumo_tabaco_100 == 1) %>%
+  mutate(RangoEdad = cut(bhch04,
+                     breaks = c(18, 24, 34, 49, 65, 100),
+                     labels= c("18-24", "25-34", "35-49", "50-65", "65+"),
+                     right = TRUE,
+                     include.lowest = TRUE
+                     )) %>%
+  group_by(RangoEdad) %>%
+  summarise(
+    diarios = sum(bita04 == 1, na.rm = TRUE),
+    a_veces = sum(bita04 == 2, na.rm = TRUE),
+    total = diarios + a_veces,
+    .groups = 'drop'
+  )
+
+
+```
+
+<!-- Datos: Entorno de los No fumadores -->
+
+```{r entorno, echo=FALSE}
+
+# 2005
+  entorno2005 <- datos2005 %>%
+  filter(CONSUMO_TABACO_100 == 3 & CITA09 == 1) %>%
+    mutate(RangoEdad = cut(CHCH05,
+                     breaks = c(18, 24, 34, 49, 65, 100),
+                     labels= c("18-24", "25-34", "35-49", "50-65", "65+"),
+                     right = TRUE,
+                     include.lowest = TRUE
+                     )) %>%
+  group_by(RangoEdad) %>%
+  summarise(
+    casa = sum(CITA11_1 == 1),
+    trabajo = sum(CITA11_2 == 1),
+    estudio = sum(CITA11_3 == 1),
+    otros = sum(CITA11_4 == 1),
+        .groups = 'drop'
+  )
+
+# 2009
+  entorno2009 <- datos2009 %>%
+  filter(CON_TA == 3 & BITA13 == 1) %>%
+  mutate(RangoEdad = cut(BHCH05,
+                     breaks = c(18, 24, 34, 49, 65, 100),
+                     labels= c("18-24", "25-34", "35-49", "50-65", "65+"),
+                     right = TRUE,
+                     include.lowest = TRUE
+                     )) %>%
+  group_by(RangoEdad) %>%
+  summarise(
+    casa = sum(BITA14_01 == 1),
+    trabajo = sum(BITA14_02 == 1),
+    estudio = sum(BITA14_03 == 1),
+    otros = sum(BITA14_04 == 1, BITA14_05 == 1, BITA14_06 == 1),
+        .groups = 'drop'
+  )
+
+# 2013
+  entorno2013 <- datos2013 %>%
+  filter(CONSUMO_TABACO_100 == 3 & BITA13 == 1) %>%
+  mutate(RangoEdad = cut(BHCH05,
+                     breaks = c(18, 24, 34, 49, 65, 100),
+                     labels= c("18-24", "25-34", "35-49", "50-65", "65+"),
+                     right = TRUE,
+                     include.lowest = TRUE
+                     )) %>%
+  group_by(RangoEdad) %>%
+  summarise(
+    casa = sum(BITA14_01 == 1),
+    trabajo = sum(BITA14_02 == 1),
+    estudio = sum(BITA14_03 == 1),
+    otros = sum(BITA14_04 == 1, BITA14_05 == 1, BITA14_06 == 1),
+        .groups = 'drop'
+  )
+  
+# 2018
+  entorno2018 <- datos2018 %>%
+  filter(consumo_tabaco_100 == 3 & bhch04 >= 18 & bhch04 < 104) %>%
+  mutate(RangoEdad = cut(bhch04,
+                     breaks = c(18, 24, 34, 49, 65, 100),
+                     labels= c("18-24", "25-34", "35-49", "50-65", "65+"),
+                     right = TRUE,
+                     include.lowest = TRUE
+                     )) %>%
+    group_by(RangoEdad) %>%
+    summarise(
+      casa = sum(bita10_01 == 1),
+      trabajo = sum(bita10_02 == 1),
+      estudio = sum(bita10_03 == 1),
+      otros = sum(bita10_04 == 1, bita10_05 == 1, bita10_06 == 1),    
+      .groups = 'drop'
+    )
+
+```
+
+<!-- Datos: Intención de dejar de fumar | Influencia de publicidad sobre el riesgo -->
+
+```{r dejarHabito, echo=FALSE}
+
+# 2005
+dejar2005 <- datos2005 %>%
+  filter(CITA07 != 9 & CONSUMO_TABACO_100 == 1) %>%
+  summarise(
+    si = sum(CITA07 == 1),
+    no = sum(CITA07 == 2),
+    totalFumadores = sum(CONSUMO_TABACO_100 == 1 & CITA07 != 9, na.rm = TRUE)
+  )
+
+# 2009
+dejar2009 <- datos2009 %>%
+  filter(BITA11 != 9 & CON_TA == 1) %>%
+  summarise(
+    si = sum(BITA11 == 1),
+    no = sum(BITA11 == 2),
+    totalFumadores = sum(CON_TA == 1 & BITA11 != 9, na.rm = TRUE)
+  )
+
+# 2013
+dejar2013 <- datos2013 %>%
+  filter(BITA11 != 9 & CONSUMO_TABACO_100 == 1) %>%
+  summarise(
+    si_SinPublicidad = sum(BITA11 == 1 & BITA16 == 2),
+    no_SinPublicidad = sum(BITA11 == 2 & BITA16 == 2),
+    si_ConPublicidad = sum(BITA17 == 1 & BITA16 == 1),
+    no_ConPublicidad = sum(BITA17 == 2 & BITA16 == 1),
+    si = sum(si_SinPublicidad, si_ConPublicidad),
+    no = sum(no_SinPublicidad, no_ConPublicidad),
+    totalFumadores = sum(CONSUMO_TABACO_100 == 1 & BITA11 != 9, na.rm = TRUE)
+  )
+
+# 2018
+dejar2018 <- datos2018 %>%
+  filter(bita08 != 9 & consumo_tabaco_100 == 1) %>%
+  summarise(
+    si_SinPublicidad = sum(bita08 == 1 & bita14 == 2),
+    no_SinPublicidad = sum(bita08 == 2 & bita14 == 2),
+    si_ConPublicidad = sum(bita15 == 1 & bita14 == 1),
+    no_ConPublicidad = sum(bita15 == 2 & bita14 == 1),
+    si = sum(si_SinPublicidad, si_ConPublicidad),
+    no = sum(no_SinPublicidad, no_ConPublicidad),
+    totalFumadores = sum(consumo_tabaco_100 & bita08 != 9, na.rm = TRUE)
+  )
+
+```
+
+## Introducción
+
+En el año 2011, el Poder Ejecutivo de la Nación (PEN) promulgó la ley
+26.687, conocida también como "Ley Antitabaco" o "Ley de regulación de
+la publicidad, promoción y consumo de los productos elaborados con
+tabaco" en cumplimiento con el "Convenio Marco para el Control del
+Tabaco" suscripto por Argentina en el año 2003 en calidad de Estado
+miembro de la Organización Mundial de la Salud (OMS). La finalidad de
+esta normativa es la protección de la salud pública y hasta nuestros
+días continua vigente. El objetivo de este informe es analizar los
+presuntos efectos disuasorios, en particular, sobre la población de
+fumadores. Debe tenerse en cuenta que previo a la promulgación de esta
+ley nacional, las distintas provincias ya contaban con distintas
+legislaciones en la materia, sin embargo, ninguna de ellas apelo a una
+estrategia disuasiva como la propuesta en el Capítulo III (Artículos 10
+al 14) de la ley 26.687 respecto de los empaquetados y envases
+vinculados al consumo de tabaco:
+
+> ARTICULO 7º — En todos los casos la publicidad o promoción deberá
+> incluir uno de los siguientes mensajes sanitarios, cuyo texto estará
+> impreso, escrito en forma legible, prominente y proporcional dentro de
+> un rectángulo de fondo blanco con letras negras, que deberá ocupar el
+> veinte por ciento (20%) de la superficie total del material objeto de
+> publicidad o promoción: <br> a) Fumar causa cáncer; <br> b) Fumar
+> causa enfisema pulmonar; <br> c) Fumar causa adicción; <br> d) Fumar
+> causa impotencia sexual; <br> e) Fumar causa enfermedades cardíacas y
+> respiratorias; <br> f) El humo de tabaco es causa de enfermedad y
+> muerte; <br> g) La mujer embarazada que fuma causa daños irreparables
+> a su hijo; <br> h) Fumar causa muerte por asfixia; <br> i) Fumar quita
+> años de vida; <br> j) Fumar puede causar amputación de piernas. <br>
+> En todos los casos se incluirá un pictograma de advertencia sobre el
+> daño que produce el hábito de fumar, el que será establecido para cada
+> mensaje por la autoridad de aplicación de esta ley. <br> ARTICULO 10.
+> — Los empaquetados y envases de productos elaborados con tabaco
+> llevarán insertos una imagen y un mensaje sanitario que describa los
+> efectos nocivos del consumo de productos elaborados con tabaco, de
+> conformidad con el listado expuesto en el artículo 7º ... <br>
+> ARTICULO 11. — Cada mensaje sanitario y su correspondiente imagen
+> serán consignados en cada paquete y envase individual de venta al
+> público de los productos elaborados con tabaco. <br> ARTICULO 12. —
+> Los paquetes y envases de productos elaborados con tabaco deberán
+> incluir además, en uno (1) de sus laterales, información sobre el
+> servicio gratuito para dejar de fumar que suministre el Ministerio de
+> Salud. <br> ARTICULO 13. — En los paquetes y envases de productos
+> elaborados con tabaco no podrán utilizarse expresiones tales como
+> "Light"; "Suave", "Milds", "bajo en contenido de nicotina y
+> alquitrán", o términos similares, ... .
+
+De modo que toda la sociedad, pero sobre todo, los fumadores, quedaron
+advertidos de los efectos del consumo del tabaco sobre el organismo
+humano. Por otro lado, la ley refuerza las prohibiciones ya establecidas
+de forma local por las provincias respecto del fumar en todo espacio
+cerrado en el artículo 23, brindando una lista no taxativa.
+
+## Metodología
+
+Para la elaboración de este informe se utilizaron las bases de datos
+derivadas de la Encuesta Nacional de Factores de Riesgo (ENFR) publicada
+en 2005, 2009, 2013 y 2018 por parte del INDEC. Empleando R se realizo
+el cruzamiento de distintos datos ofrecidos por la ENFR con el fin de
+analizar los efectos de la ley 26.687/11 en los fumadores y la población
+en general. Para ello, este trabajo presenta: <br> 1. Distribución de
+fumadores, no fumadores y ex fumadores en la población nacional. <br> 2.
+Distribución entre personas que han fumado alguna vez y que nunca lo han
+hecho por provincia. <br> 3. Variaciones en la edad en que la población
+de fumadores empezaro a fumar. <br> 4. Variaciones en el hábito de
+consumo del tabaco entre la población de fumadores. <br> 5. Variación en
+la percepción de los no fumadores de los entornos compartidos con
+fumadores. <br> 6. Variación en la intención de dejar de fumar por parte
+de la población de fumadores. <br> Se descartan los Ns./Nc. a la hora de
+realizar los gráficos.
+
+A su vez, es necesario detallar que se siguen las categorías
+establecidas por INDEC en el "Documento para la utilización de la base
+de datos usuario":
+
+> Consumo de tabaco <br> Esta variable distingue fumadores actuales, ex
+> fumadores y no fumadores. <br> - Se considera fumadores actuales a
+> aquellas personas que fuman todos o algunos días en la actualidad y
+> que a lo largo de su vida han fumado al menos 100 cigarrillos. <br> -
+> Se considera ex fumadores a aquellas personas que fumaron alguna vez
+> en su vida al menos 100 cigarrillos y no fuman actualmente. <br> - Se
+> considera no fumadores a aquellas personas que nunca fumaron
+> cigarrillos o que, si lo hicieron, fumaron menos de 100 cigarrillos en
+> su vida.
+
+El total de personas encuestadas por la ENFR fue la siguiente: <br>
+2005: `r totalEncuestados2005` encuestados. <br> 2009:
+`r totalEncuestados2009` encuestados. <br> 2013:
+`r totalEncuestados2013` encuestados. <br> 2018:
+`r totalEncuestados2018` encuestados. <br>
+
+## Análisis
+
+### 1. Distribución de fumadores, no fumadores y ex fumadores entre la población nacional
+
+<!-- Torta -->
+
+```{r graficoTorta, echo=FALSE}
+
+crear_grafico <- function(año) {
+  data_año <- resultado_total %>% filter(año == !!año)
+  
+  plot_ly(data_año, labels = ~c("Fumador", "Ex Fumador", "No Fumador"), 
+          values = ~c(fumador, exFumador, noFumador), type = 'pie', 
+          marker = list(colors = c("red", "orange", "blue"))) %>%
+    layout(title = paste("Año", año),
+           showlegend = TRUE)
+}
+
+ui <- fluidPage(
+  sidebarLayout(
+    sidebarPanel(
+      selectInput("year", "Seleccionar un año:", 
+                  choices = unique(resultado_total$año))
+    ),
+    mainPanel(
+      plotlyOutput("pieChart")
+    )
+  )
+)
+
+server <- function(input, output) {
+  output$pieChart <- renderPlotly({
+    crear_grafico(input$year)
+  })
+}
+
+# Ejecutar la aplicación
+shinyApp(ui = ui, server = server)
+
+```
+
+Se puede apreciar que entre 2005 y 2018 la población de fumadores cayó
+un 9%, ex fumadorores subió un 3,4% y no fumadores subió un 5,6%.
+
+### 2. Distribución entre personas que han fumado alguna vez y aquellas que nunca han fumado por provincia
+
+<!-- Treemap -->
+
+```{r treeMap, echo=FALSE}
+
+crear_treemap_fumadores <- function(año) {
+  
+  datos_filtrados <- encuestadosTabaquismo %>%
+    filter(Año == año)
+
+  datos_filtrados <- datos_filtrados %>%
+    mutate(total_encuestados = si + no)
+
+  p_fumadores <- plot_ly(
+    data = datos_filtrados,
+    labels = ~Provincia,
+    parents = ~Año,
+    values = ~si,
+    type = 'treemap',
+    text = ~paste(Provincia,
+                  '<br>Hombres que han fumado al menos una vez: ', hombresQueHanFumado,
+                  '<br>Mujeres que han fumado al menos una vez: ', mujeresQueHanFumado,
+                  '<br>Total de encuestados que han fumado al menos una vez: ', si,' (',
+                  round((hombresQueHanFumado / total_encuestados) * 100, 1) +
+                  round((mujeresQueHanFumado / total_encuestados) * 100, 1), '% de ', total_encuestados
+                  ,'encuestados)',
+                  '<br>','(',
+                  round((hombresQueHanFumado / total_encuestados) * 100, 1), '% hombres y ',
+                  round((mujeresQueHanFumado / total_encuestados) * 100, 1), '% mujeres de ', 
+                  total_encuestados, ' encuestados)'),
+    textinfo = "label+value+percent entry",
+    hoverinfo = "text"
+  ) %>%
+    layout(title = paste("Año", año))
+  
+  return(p_fumadores)
+}
+
+crear_treemap_no_fumadores <- function(año) {
+  datos_filtrados <- encuestadosTabaquismo %>%
+    filter(Año == año)
+
+  datos_filtrados <- datos_filtrados %>%
+    mutate(total_encuestados = si + no)
+
+  p_no_fumadores <- plot_ly(
+    data = datos_filtrados,
+    labels = ~Provincia,
+    parents = ~Año,
+    values = ~no,
+    type = 'treemap',
+    text = ~paste(Provincia,
+                  '<br>Hombres que nunca han fumado: ', hombresQueNuncaHanFumado,
+                  '<br>Mujeres que nunca han fumado: ', mujeresQueNuncaHanFumado,
+                  '<br>Total de encuestados que nunca han fumado: ', no,' (',
+                  round((hombresQueNuncaHanFumado / total_encuestados) * 100, 1) +
+                  round((mujeresQueNuncaHanFumado / total_encuestados) * 100, 1), '% de ', total_encuestados
+                  ,'encuestados)',
+                  '<br>','(',
+                  round((hombresQueNuncaHanFumado / total_encuestados) * 100, 1), '% hombres y ',
+                  round((mujeresQueNuncaHanFumado / total_encuestados) * 100, 1), '% mujeres de ', 
+                  total_encuestados, ' encuestados)'),
+    textinfo = "label+value+percent entry",
+    hoverinfo = "text"
+  ) %>%
+    layout(title = paste("Año", año))
+  
+  return(p_no_fumadores)
+}
+
+provincias_fumadores <- function(año) {
+  encuestadosTabaquismo %>%
+    filter(Año == año) %>%
+    arrange(desc(si)) %>%
+    select(Provincia, si) %>%
+    head(10) %>%
+    rename("Han fumado al menos una vez" = si)
+}
+
+provincias_no_fumadores <- function(año) {
+  encuestadosTabaquismo %>%
+    filter(Año == año) %>%
+    arrange(desc(no)) %>%
+    select(Provincia, no) %>%
+    head(10) %>%
+    rename("Nunca han fumado" = no)
+}
+
+ui <- fluidPage(
+  sidebarLayout(
+    sidebarPanel(
+      selectInput("anio", "Seleccionar el año:", choices = unique(encuestadosTabaquismo$Año)),
+      selectInput("tipo", "Seleccionar el tipo de dato:", choices = c("Han fumado al menos una vez",
+                                                                      "Nunca han fumado"))
+    ),
+    mainPanel(
+      plotlyOutput("treemap"),
+      fluidRow(
+        column(6, 
+               tableOutput("tabla_fumadores")),
+        column(6, 
+               tableOutput("tabla_no_fumadores"))
+      )
+    )
+  )
+)
+
+server <- function(input, output) {
+  output$treemap <- renderPlotly({
+    if (input$tipo == "Han fumado al menos una vez") {
+      crear_treemap_fumadores(input$anio)
+    } else {
+      crear_treemap_no_fumadores(input$anio)
+    }
+  })
+  
+  output$tabla_fumadores <- renderTable({
+    provincias_fumadores(input$anio)
+  })
+  
+  output$tabla_no_fumadores <- renderTable({
+    provincias_no_fumadores(input$anio)
+  })
+}
+
+# Ejecutar la aplicación Shiny
+shinyApp(ui = ui, server = server)
+
+```
+
+De este gráfico se extraen las siguientes conclusiones: <br> 1) Entre
+2005 y 2009, hay un cambio respecto de las provincias con mayor cantidad
+de personas que han fumado al menos una vez. <br> 2) A partir de 2009,
+se consolida Buenos Aires, Córdoba y Santa Fe como las provincias con
+mayor cantidad de personas que han fumado al menos una vez. <br> 3) De
+2005 a 2018 existe una tendencia en la mayor parte de las provincias a
+reducir la brecha entre hombres y mujeres que han fumado alguna vez.
+<br> 4) De 2005 a 2018 existe una tendencia en todas las provincias
+donde la población femenina que nunca fumo es decreciente mientras que
+la población masculina es creciente.
+
+### 3. Variación en la edad en que la población de fumadores empezaron a fumar
+
+<!-- Lineas -->
+
+```{r graficoLineas, echo=FALSE}
+
+ggplot_fumadores <- ggplot(fumadoresCombinados, aes(x = RangoEdad, y = fumadores, color = as.factor(Año), group = Año)) +
+  geom_line(linewidth = 1.2) + 
+  geom_point(size = 3) +
+  labs(
+    x = "Rango de Edad",
+    y = "Fumadores",
+    color = "Año"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+plotly_fumadores <- ggplotly(ggplot_fumadores)
+plotly_fumadores
+
+```
+
+Se observa que la mayor parte de la población de fumadores comienza a
+consumir tabaco en el rango etario que va entre los 10 y los 19 años,
+así mismo se aprecia que con el paso de los años va disminuyendo la
+cantidad de fumadores que se iniciaron en dicho rango.
+
+### 4. Variación en el hábito de consumo del tabaco entre la población de fumadores
+
+<!-- Barras Apiladas -->
+
+```{r graficoBarrasApiladas, echo=FALSE}
+
+habito_total <- rbind(
+  habito2005 %>% mutate(Año = 2005, Tipo = "Diarios", diarios = diarios),
+  habito2005 %>% mutate(Año = 2005, Tipo = "Casuales", diarios = a_veces),
+  habito2009 %>% mutate(Año = 2009, Tipo = "Diarios", diarios = diarios),
+  habito2009 %>% mutate(Año = 2009, Tipo = "Casuales", diarios = a_veces),
+  habito2013 %>% mutate(Año = 2013, Tipo = "Diarios", diarios = diarios),
+  habito2013 %>% mutate(Año = 2013, Tipo = "Casuales", diarios = a_veces),
+  habito2018 %>% mutate(Año = 2018, Tipo = "Diarios", diarios = diarios),
+  habito2018 %>% mutate(Año = 2018, Tipo = "Casuales", diarios = a_veces)
+)
+
+ui <- fluidPage(
+  
+  sidebarLayout(
+    sidebarPanel(
+      selectInput("selected_year", "Seleccionar un Año:",
+                  choices = unique(habito_total$Año),
+                  selected = 2005)
+    ),
+    
+    mainPanel(
+      plotlyOutput("bar_plot")
+    )
+  )
+)
+
+server <- function(input, output) {
+  output$bar_plot <- renderPlotly({
+    datos_filtrados <- habito_total %>% filter(Año == input$selected_year)
+    
+    datos_filtrados <- datos_filtrados %>%
+      mutate(hover_text = paste("Rango de Edad:", RangoEdad,
+                                 "<br>Tipo de Fumador:", Tipo,
+                                 "<br>Cantidad:", diarios))
+
+    ggplot_obj <- ggplot(datos_filtrados, aes(x = RangoEdad, y = diarios, fill = Tipo, text = hover_text)) +
+      geom_bar(stat = "identity", position = "stack") +
+      labs(title = paste("Año", input$selected_year),
+           x = "Rango de Edad",
+           y = "Cantidad de Fumadores",
+           fill = "Tipo de Fumador") +
+      scale_fill_manual(values = c("Diarios" = "red", "Casuales" = "orange")) +
+      theme_minimal()
+    
+    plotly_obj <- ggplotly(ggplot_obj, tooltip = "text")
+    plotly_obj
+  })
+}
+
+shinyApp(ui = ui, server = server)
+```
+
+Se aprecia entre 2015 y 2018 la tendencia en la cuál se reduce la
+población de fumadores diarios y aumenta la población de fumadores
+casuales. Esta tendencia se mantiene a lo largo de los distintos rangos
+etarios pero a medida que aumenta la edad se desacelera, de modo que los
+mayores de 65 años, apenas modifican su hábito de fumar.
+
+### 5. Variación en la percepción de los no fumadores de los entornos compartidos con fumadores
+
+<!-- Burbujas-->
+
+```{r graficoBurbujas, echo=FALSE}
+
+entorno_completo <- bind_rows(
+  mutate(entorno2005, Año = 2005),
+  mutate(entorno2009, Año = 2009),
+  mutate(entorno2013, Año = 2013),
+  mutate(entorno2018, Año = 2018)
+)
+
+ui <- fluidPage(
+  sidebarLayout(
+    sidebarPanel(
+      selectInput("anio", "Seleccionar año:", choices = unique(entorno_completo$Año), selected = 2005)
+    ),
+    
+    mainPanel(
+      plotlyOutput("bubblePlot")
+    )
+  )
+)
+
+server <- function(input, output) {
+  
+  output$bubblePlot <- renderPlotly({
+    
+    datos_filtrados <- entorno_completo %>%
+      filter(Año == input$anio)
+
+    datos_largos <- datos_filtrados %>%
+      pivot_longer(cols = c(casa, trabajo, estudio, otros), 
+                   names_to = "Entorno", 
+                   values_to = "Cantidad") %>%
+      mutate(Entorno = recode(Entorno, 
+                              "estudio" = "Centros Educativos",
+                              "trabajo" = "Trabajo",
+                              "otros" = "Otros",
+                              "casa" = "Casa"))
+
+    if (nrow(datos_largos) == 0) {
+      return(NULL)
+    }
+    
+plot_bubble <- ggplot(datos_largos, aes(x = RangoEdad, y = Entorno, size = Cantidad, color = Entorno, 
+                                        text = paste("Rango de Edad:", RangoEdad,
+                                                     "<br>Cantidad:", Cantidad,
+                                                     "<br>Entorno:", Entorno))) +
+  geom_point(alpha = 0.7) +
+  scale_size(range = c(3, 15)) +
+  labs(title = paste("Año", input$anio),
+       x = "Rango de Edad",
+       y = "Entorno",
+       color = "Referencias") +
+  guides(size="none") + 
+  theme_minimal()
+
+plotly_obj <- ggplotly(plot_bubble, tooltip = "text")
+  })
+}
+
+shinyApp(ui = ui, server = server)
+
+```
+
+Entre 2005 y 2018 se puede observar la tendencia según la cual los
+encuestados no fumadores de todas las edades perciben menos fumadores en
+entornos compartidos con estos, principalmente el propio hogar, las
+instituciones educativas y el trabajo. Sin embargo, en la categoría
+"Otros" se revierte la tendencia y se observa un aumento, dentro de esta
+categoría están los clubes deportivos, locales gastronómicos, centros de
+salud, espacios de "ocio nocturno", etc.
+
+### 6. Variación en la intención de dejar de fumar por parte de la población de fumadores
+
+<!-- Barras Apiladas II -->
+
+```{r graficoFinalUno, echo=FALSE}
+data <- data.frame(
+  año = c(2005, 2009, 2013, 2018),
+  si = c(dejar2005$si, dejar2009$si, dejar2013$si, dejar2018$si),
+  no = c(dejar2005$no, dejar2009$no, dejar2013$no, dejar2018$no),
+  totalFumadores = c(dejar2005$totalFumadores, dejar2009$totalFumadores, dejar2013$totalFumadores, dejar2018$totalFumadores)
+)
+
+data <- data %>%
+  mutate(
+    porcentaje_si = round((si / totalFumadores) * 100, 1),
+    porcentaje_no = round((no / totalFumadores) * 100, 1)
+  )
+
+# Gráfico modificado para mostrar números y porcentajes
+p <- plot_ly(data, y = ~factor(año), x = ~totalFumadores, type = 'bar', name = 'Total de Fumadores Encuestados',
+              marker = list(color = 'green'), 
+              text = ~paste(totalFumadores, "(100%)"), 
+              hoverinfo = 'text') %>%
+  add_trace(y = ~factor(año), x = ~si, name = 'Con intención de dejar de fumar',
+            marker = list(color = 'blue'), 
+            text = ~paste(si, "(", porcentaje_si, "%)"), 
+            hoverinfo = 'text') %>%
+  add_trace(y = ~factor(año), x = ~no, name = 'Sin intención de dejar de fumar',
+            marker = list(color = 'red'), 
+            text = ~paste(no, "(",  porcentaje_no, "%)"), 
+            hoverinfo = 'text') %>%
+  layout(
+         yaxis = list(title = "Año"),
+         xaxis = list(title = "Cantidad"),
+         barmode = 'group')
+
+p
+```
+
+En general se observa que previo a 2011 ya había una parte importante de
+fumadores encuestados que habrían declarado la intención de dejar de
+fumar, la tendencia se revierte en 2018 donde empiezan a disminuir la
+cantidad de fumadores dispuestos a dejarlo.
+
+## Conclusión
+
+En razón de los datos analizados, puede concluirse que: <br> 1) Previo a
+la ley 26.687/11 ya existía una tendencia, posiblemente cultural, por
+dejar el consumo de tabaco. <br> 2) La ENFR comenzó su encuesta en 2005,
+año en el que muchas provincias empezaron a promulgar sus propias leyes
+relativas al consumo del tabaco. <br> 3) El cambio cultural ha hecho que
+se empiece a equiparar la cantidad de hombres con la cantidad de mujeres
+que fuman o han fumado alguna vez. 4) Que el "efecto disuasorio" que
+persigue la ley es inexistente, y por ende, es un proceso
+cultural/social, del modo que desglosando los datos de 2013 y 2018 (años
+con ley vigente) relativos a los fumadores con intenciones de dejar el
+tabaco se observa lo siguiente:
+
+```{r graficoFinalDos, echo=FALSE}
+
+data_pub <- data.frame(
+  año = c(2013, 2018),
+  si_SinPublicidad = c(dejar2013$si_SinPublicidad, dejar2018$si_SinPublicidad),
+  no_SinPublicidad = c(dejar2013$no_SinPublicidad, dejar2018$no_SinPublicidad),
+  si_ConPublicidad = c(dejar2013$si_ConPublicidad, dejar2018$si_ConPublicidad),
+  no_ConPublicidad = c(dejar2013$no_ConPublicidad, dejar2018$no_ConPublicidad)
+)
+
+# Calcular totales por año
+data_pub$total_SinPublicidad <- data_pub$si_SinPublicidad + data_pub$no_SinPublicidad
+data_pub$total_ConPublicidad <- data_pub$si_ConPublicidad + data_pub$no_ConPublicidad
+
+# Calcular porcentajes
+data_pub$perc_si_SinPublicidad <- (data_pub$si_SinPublicidad / data_pub$total_SinPublicidad) * 100
+data_pub$perc_no_SinPublicidad <- (data_pub$no_SinPublicidad / data_pub$total_SinPublicidad) * 100
+data_pub$perc_si_ConPublicidad <- (data_pub$si_ConPublicidad / data_pub$total_ConPublicidad) * 100
+data_pub$perc_no_ConPublicidad <- (data_pub$no_ConPublicidad / data_pub$total_ConPublicidad) * 100
+
+# Crear el gráfico con cantidades y porcentajes
+p_pub <- plot_ly(data_pub, y = ~factor(año), x = ~si_SinPublicidad, type = 'bar', name = 'Intención de dejar de fumar (Sin influencia publicitaria)',
+                 marker = list(color = 'blue'), 
+                 text = ~paste(si_SinPublicidad, " (", round(perc_si_SinPublicidad, 2), "%)"), 
+                 hoverinfo = 'text') %>%
+  add_trace(y = ~factor(año), x = ~no_SinPublicidad, name = 'Sin intención de dejar de fumar (Sin influencia publicitaria)',
+            marker = list(color = 'lightblue'), 
+            text = ~paste(no_SinPublicidad, " (", round(perc_no_SinPublicidad, 2), "%)"), 
+            hoverinfo = 'text') %>%
+  add_trace(y = ~factor(año), x = ~si_ConPublicidad, name = 'Intención de dejar de fumar (Con influencia publicitaria)',
+            marker = list(color = 'red'), 
+            text = ~paste(si_ConPublicidad, " (", round(perc_si_ConPublicidad, 2), "%)"), 
+            hoverinfo = 'text') %>%
+  add_trace(y = ~factor(año), x = ~no_ConPublicidad, name = 'Sin intención de dejar de fumar (Con influencia publicitaria)',
+            marker = list(color = 'pink'), 
+            text = ~paste(no_ConPublicidad, " (", round(perc_no_ConPublicidad, 2), "%)"), 
+            hoverinfo = 'text') %>%
+  layout(
+         yaxis = list(title = "Año"),
+         xaxis = list(title = "Cantidad"),
+         barmode = 'group')
+
+p_pub
+
+```
+
+2013 es el último año que sigue la tendencia donde es mayor la cantidad
+de población fumadora que afirma tener intenciones de dejar de fumar,
+dado que 2018, con publicidad mediante sobre los riesgos en cada
+envoltorio o paquete de cigarros, es el año que reporta más fumadores
+sin intención de dejarlo, es el primer año que revierte la tendencia
+desde 2005.
